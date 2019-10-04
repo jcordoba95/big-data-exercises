@@ -16,7 +16,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
+
 
 public class MovieRecommender {
     public int                  totalReviews;
@@ -27,35 +27,21 @@ public class MovieRecommender {
     HashMap<Integer, String>    invertedProductsMap = new HashMap();
     HashMap<String, Long>       usersMap            = new HashMap();
 
-//    public static void main(String[] args) throws TasteException {
-//        MovieRecommender recommender = new MovieRecommender("/Users/jcordoba/Documents/test/movies/big-data-exercises/src/test/java/nearsoft/academy/bigdata/recommendation/movies.txt");
-//        List<String> recommendations = recommender.getRecommendationsForUser("A141HP4LYPWMSR");
-//
-//    }
-
     public MovieRecommender(String path){
         DataModel           model;
         UserSimilarity      similarity;
         UserNeighborhood    neighborhood;
 
         // Buffer file
-        try{
-//            Using Gzip:
-
-//            InputStream fileStream = new FileInputStream(path);
-//            InputStream gzipStream = new GZIPInputStream(fileStream);
-//            Reader decoder = new InputStreamReader(gzipStream, "US-ASCII");
-//            BufferedReader br = new BufferedReader(decoder);
-
-//            Reading txt file
+        try {
             File            file    = new File(path);
             BufferedReader  br      = new BufferedReader(new FileReader(file));
             FileWriter      writer  = new FileWriter("data.csv");
             BufferedWriter  bw      = new BufferedWriter(writer);
-
             long    cantUsers       = 0;
             int     cantProducts    = 0;
             String  csvLine         = "";
+
             for (String line = br.readLine(); line != null; line = br.readLine()) {
                 if (line.startsWith("product/productId")) {
                     String productId = line.split(" ")[1];
@@ -96,61 +82,53 @@ public class MovieRecommender {
             System.out.println("Could not read file. Exception: " + e.getMessage());
         }
 
+        // Build Recommender
         try {
+            // Data Model:
             model = new FileDataModel(new File("data.csv"));
-
-            // Create similarity
-            try{
-                similarity = new PearsonCorrelationSimilarity(model);
+            try {
                 //Threshold Similarity:
-                neighborhood = new ThresholdUserNeighborhood(0.1, similarity, model);
-
-                // Create Recomender
-                try{
+                similarity      = new PearsonCorrelationSimilarity(model);
+                neighborhood    = new ThresholdUserNeighborhood(0.1, similarity, model);
+                try {
+                    // Create Recommender
                     this.recommender = new GenericUserBasedRecommender(model, neighborhood, similarity);
 
-
-                } catch (Exception e){
+                } catch (Exception e) {
                     System.out.println("Exception found while creating recommender: " + e.getMessage());
                 }
-            } catch (Exception e){
+            } catch (Exception e) {
                 System.out.println("Exception found while creating similarity or neighborhood: " + e.getMessage());
             }
-
         } catch (Exception e) {
             System.out.println("Exception found while creating model: " + e.getMessage());
         }
 
-
-
-
-
     }
 
-    public int getTotalReviews(){
+    public int getTotalReviews() {
         return this.totalReviews;
     }
 
-    public int getTotalProducts(){
+    public int getTotalProducts() {
         return this.totalProducts;
     }
 
-    public long getTotalUsers(){
+    public long getTotalUsers() {
         return this.totalUsers;
     }
 
     public List<String> getRecommendationsForUser(String userID) throws TasteException {
 
-        // List with recommended results
-        List<String> results = new ArrayList<String>();
+        // List to be filled with recommended results
+        List<String> results = new ArrayList<>();
 
         /*
          *   PARAMS recommend(l, i):
          *
          *   l => userID
-         *   i => amount of recommended items we want to be returned
+         *   i => amount of recommended items we want returned
          */
-//        long id = Long.parseLong(this.usersMap.get(userID).toString());
         long id = usersMap.get(userID);
         List<RecommendedItem> recommendations = recommender.recommend(id, 3);
         for (RecommendedItem r : recommendations) {
