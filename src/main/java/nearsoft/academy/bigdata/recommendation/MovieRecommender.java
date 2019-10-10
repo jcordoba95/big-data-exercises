@@ -21,113 +21,149 @@ import org.apache.mahout.cf.taste.recommender.UserBasedRecommender;
 import org.apache.mahout.cf.taste.similarity.UserSimilarity;
 
 public class MovieRecommender {
-	private int totalReviews = 0;
-	private int totalProducts = 0;
-	private long totalUsers = 0;
-	private UserBasedRecommender recommender;
-	private HashMap<Integer, String> invertedProductsMap = new HashMap();
-	private HashMap<String, Long> usersMap = new HashMap();
+  private int totalReviews = 0;
+  private int totalProducts = 0;
+  private long totalUsers = 0;
+  private UserBasedRecommender recommender;
+  private HashMap<Integer, String> invertedProductsMap = new HashMap<>();
+  private HashMap<String, Long> usersMap = new HashMap<>();
+  private HashMap<String, Integer> productsMap = new HashMap<>();
+  private String productPortion = "";
+  private String userPortion = "";
+  /**
+   * <p>
+   *   Constructor that builds .csv file from amazon recommendations .txt file and
+   *   creates object "recommender" that can be used later by class's methods.
+   * </p>
+   * @param path path where .txt file is located.
+   * @since 1.0
+   * */
+  
+  public MovieRecommender(String path) throws IOException, TasteException {
+    // Call method to generate .csv file
+    csvBuilder(path);
+    
+    // Build Recommender
+    buildRecommender();
+  }
+  
+  /**
+   * <p> Creates a GenericUserBasedRecommender from a .csv file in root folder.</p>
+   * @throws IOException FileDataModel handles IOExceptions
+   * @throws TasteException PearsonCorrelationSimilarity handles TasteExceptions
+   * @since 1.0
+   * */
+  
+  private void buildRecommender() throws IOException, TasteException {
+    DataModel model;
+    UserSimilarity similarity;
+    UserNeighborhood neighborhood;
+    // Data Model:
+    model = new FileDataModel(new File("data.csv"));
+    //Threshold Similarity:
+    similarity = new PearsonCorrelationSimilarity(model);
+    neighborhood = new ThresholdUserNeighborhood(0.1, similarity, model);
+    // Create Recommender
+    this.recommender = new GenericUserBasedRecommender(model, neighborhood, similarity);
+    
+  }
+  
+  /**
+   * <p> Generates .csv file in root folder from a .txt file.</p>
+   * @param path path of the .txt file with amazon reviews.
+   * @throws IOException recommender handles IOExceptions.
+   * @since 1.0
+   * */
+  
+  private void csvBuilder(String path) throws IOException {
+    File file = new File(path);
+    BufferedReader br = new BufferedReader(new FileReader(file));
+    FileWriter writer = new FileWriter("data.csv");
+    BufferedWriter bw = new BufferedWriter(writer);
+    // Iterate through .txt to create each line of the new .csv file
+    for (String line = br.readLine(); line != null; line = br.readLine()) {
+      
+      if (line.startsWith("review/score")) {
+        String reviewScore = line.split(" ")[1];
+        bw.write(this.userPortion + this.productPortion + reviewScore + "\n");
+      } else {
+        // Call method to check for the remaining components of .csv line
+        buildCsvLine(line);
+      }
+      
+    }
+    
+    bw.close();
+  }
+  
+  /**
+   * <p>Inserts values in "productPortion" and "userPortion" for new .csv line.</p>
+   * @param line current line in .txt file.
+   * @since 1.0
+   * */
+  
+  private void buildCsvLine(String line) {
+    if (line.startsWith("product/productId")) {
+      // Read new product. Create new csv line
+      String productId = line.split(" ")[1];
+      this.totalReviews++;
+    
+      if (this.productsMap.containsKey(productId)) {
+        // Use the key in hash map
+        this.productPortion = this.productsMap.get(productId) + ",";
+      } else {
+        // Add new key to hash maps
+        this.productsMap.put(productId, this.totalProducts);
+        this.invertedProductsMap.put(this.totalProducts, productId);
+        this.productPortion = this.totalProducts + ",";
+        this.totalProducts++;
+      }
+    } else if (line.startsWith("review/userId")) {
+      String userId = line.split(" ")[1];
+    
+      if (this.usersMap.containsKey(userId)) {
+        // Use the key in hash map
+        this.userPortion = this.usersMap.get(userId) + ",";
+      } else {
+        // Add new key to hash map
+        this.usersMap.put(userId, this.totalUsers);
+        userPortion = this.totalUsers + ",";
+        this.totalUsers++;
+      }
+    }
+  }
+  
+  
+  /**
+   * <p>Returns 3 product recommendations for an specific user.</p>
+   * @param userId user that we are recommending 3 products.
+   * @return List containing Strings of product ids.
+   * @throws TasteException recommender handles TasteExceptions
+   * @since 1.0
+   * */
+  
+  List<String> getRecommendationsForUser(String userId) throws TasteException {
+    List<String> results = new ArrayList<>();
+    long id = usersMap.get(userId);
+    List<RecommendedItem> recommendations = recommender.recommend(id, 3);
+    
+    for (RecommendedItem recommendedItem : recommendations) {
+      // Retrieve the original product id form our hash map and add it to results
+      results.add(invertedProductsMap.get((int) recommendedItem.getItemID()));
+    }
+    return results;
+  }
+  
+  int getTotalReviews() {
+    return this.totalReviews;
+  }
+  
+  int getTotalProducts() {
+    return this.totalProducts;
+  }
 
-	public MovieRecommender(String path) {
-		DataModel model;
-		UserSimilarity similarity;
-		UserNeighborhood neighborhood;
-
-		// Buffer file
-		try {
-			File file = new File(path);
-			BufferedReader br = new BufferedReader(new FileReader(file));
-			FileWriter writer = new FileWriter("data.csv");
-			BufferedWriter bw = new BufferedWriter(writer);
-			long cantUsers = 0;
-			int cantProducts = 0;
-			String csvLine = "";
-			HashMap<String, Integer> productsMap = new HashMap();
-
-			// Iterate through .txt to create each line of the new .csv file
-			for (String line = br.readLine(); line != null; line = br.readLine()) {
-				if (line.startsWith("product/productId")) {
-					// We read a new product so we create a new csv
-					String productId = line.split(" ")[1];
-					this.totalReviews++;
-
-					if (productsMap.containsKey(productId)) {
-						csvLine = productsMap.get(productId) + ",";
-					} else {
-						productsMap.put(productId, cantProducts);
-						this.invertedProductsMap.put(cantProducts, productId);
-						csvLine = cantProducts + ",";
-						cantProducts++;
-					}
-				} else if (line.startsWith("review/userId")) {
-					String userId = line.split(" ")[1];
-
-					if (this.usersMap.containsKey(userId)) {
-						csvLine = this.usersMap.get(userId) + "," + csvLine;
-					} else {
-						this.usersMap.put(userId, cantUsers);
-						csvLine = cantUsers + "," + csvLine;
-						cantUsers++;
-					}
-				} else if (line.startsWith("review/score")) {
-					String reviewScore = line.split(" ")[1];
-					csvLine += reviewScore + "\n";
-					bw.write(csvLine);
-				}
-			}
-			bw.close();
-			this.totalUsers = cantUsers;
-			this.totalProducts = cantProducts;
-		} catch (IOException e) {
-			System.out.println("Could not read file. Exception: " + e.getMessage());
-			System.out.println("Stack Trace: " + e.getStackTrace().toString());
-		}
-
-		// Build Recommender
-		try {
-			// Data Model:
-			model = new FileDataModel(new File("data.csv"));
-			//Threshold Similarity:
-			similarity = new PearsonCorrelationSimilarity(model);
-			neighborhood = new ThresholdUserNeighborhood(0.1, similarity, model);
-			// Create Recommender
-			this.recommender = new GenericUserBasedRecommender(model, neighborhood, similarity);
-
-		} catch (TasteException e) {
-			System.out.println("Exception found while creating similarity or neighborhood: " + e.getMessage());
-		} catch (IOException e) {
-			System.out.println("Exception found while creating model: " + e.getMessage());
-		}
-
-	}
-
-	int getTotalReviews() {
-		return this.totalReviews;
-	}
-
-	int getTotalProducts() {
-		return this.totalProducts;
-	}
-
-	long getTotalUsers() {
-		return this.totalUsers;
-	}
-
-	List<String> getRecommendationsForUser(String userId) throws TasteException {
-
-		// List to be filled with recommended results
-		List<String> results = new ArrayList<>();
-		/*
-		 *   PARAMS recommend(l, i):
-		 *
-		 *   l => userID
-		 *   i => amount of recommended items we want returned
-		 */
-		long id = usersMap.get(userId);
-		List<RecommendedItem> recommendations = recommender.recommend(id, 3);
-		for (RecommendedItem r : recommendations) {
-			results.add(invertedProductsMap.get((int) r.getItemID()));
-		}
-		return results;
-	}
+  long getTotalUsers() {
+    return this.totalUsers;
+  }
+  
 }
