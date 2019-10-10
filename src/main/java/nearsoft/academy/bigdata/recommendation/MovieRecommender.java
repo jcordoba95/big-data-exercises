@@ -138,18 +138,20 @@ public class MovieRecommender {
    * <p>Returns 3 product recommendations for an specific user.</p>
    * @param userId user that we are recommending 3 products.
    * @return List containing Strings of product ids.
-   * @throws TasteException recommender handles TasteExceptions
    * @since 1.0
    * */
   
-  List<String> getRecommendationsForUser(String userId) throws TasteException {
+  List<String> getRecommendationsForUser(String userId) {
     List<String> results = new ArrayList<>();
     long id = usersMap.get(userId);
-    List<RecommendedItem> recommendations = recommender.recommend(id, 3);
-    
-    for (RecommendedItem recommendedItem : recommendations) {
-      // Retrieve the original product id form our hash map and add it to results
-      results.add(invertedProductsMap.get((int) recommendedItem.getItemID()));
+    try {
+      List<RecommendedItem> recommendations = recommender.recommend(id, 3);
+      for (RecommendedItem recommendedItem : recommendations) {
+        // Retrieve the original product id form our hash map and add it to results
+        results.add(invertedProductsMap.get((int) recommendedItem.getItemID()));
+      }
+    } catch (TasteException e) {
+      System.out.println("Error encountered: " + e.getMessage());
     }
     return results;
   }
